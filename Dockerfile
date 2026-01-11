@@ -1,5 +1,5 @@
 # Use the Python image variant—no Ruby installed
-FROM phusion/passenger-python312:<VERSION>
+FROM phusion/passenger-python312:0.9.35
 
 # Baseimage init
 ENV HOME /root
@@ -19,17 +19,12 @@ COPY --chown=app:app requirements.txt /home/app/webapp/
 COPY --chown=app:app passenger_wsgi.py /home/app/webapp/
 
 # Install Python dependencies
-RUN rvm-exec system bash -lc "pip3 install --no-cache-dir -r /home/app/webapp/requirements.txt"
+RUN pip3 install --no-cache-dir -r /home/app/webapp/requirements.txt
+
+# Install curl for healthcheck
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 # Optional: OS security updates
 RUN apt-get update && apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade
 
-# Clean apt cache
-RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-# Expose HTTP
-EXPOSE 80
-
-# Optional healthcheck
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s CMD curl -f http://localhost/health || exit 1
-
+# Clean
