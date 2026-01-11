@@ -1,30 +1,28 @@
-# Use the Python image variant—no Ruby installed
-FROM phusion/passenger-python312:0.9.35
+# Use official Python base image
+FROM python:3.12-slim
 
-# Baseimage init
-ENV HOME /root
-CMD ["/sbin/my_init"]
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    nginx curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Enable Nginx + Passenger
-RUN rm -f /etc/service/nginx/down
+# Set working directory
+WORKDIR /home/app/webapp
 
-# Remove default site and add our site
-RUN rm -f /etc/nginx/sites-enabled/default
-ADD webapp.conf /etc/nginx/sites-enabled/webapp.conf
-
-# Create app directory and copy code as non-root
-RUN mkdir -p /home/app/webapp
-COPY --chown=app:app app/ /home/app/webapp/
-COPY --chown=app:app requirements.txt /home/app/webapp/
-COPY --chown=app:app passenger_wsgi.py /home/app/webapp/
+# Copy application files
+COPY requirements.txt .
+COPY passenger_wsgi.py .
+COPY app/ ./app/
+COPY webapp.conf /etc/nginx/conf.d/webapp.conf
 
 # Install Python dependencies
-RUN pip3 install --no-cache-dir -r /home/app/webapp/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install curl for healthcheck
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+# Configure Nginx
+RUN rm /etc/nginx/sites-enabled/default
 
-# Optional: OS security updates
-RUN apt-get update && apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade
+# Expose port
+EXPOSE 80
 
-# Clean
+# Start Gunicorn + Nginx
+CMD service nginx start && gunicorn -w 4 -b 0.0.0.0:8000 passenger_wsgi:application
